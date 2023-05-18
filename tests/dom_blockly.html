@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+
+
+
+
+<div id="blockly">
+  <xml id="toolbox" style="display: none">
+    <block type="handle_event"></block>
+    <block type="append_element"></block>
+    <block type="query_selector"></block>
+    <block type="text_node"></block>
+    <block type="text"></block>
+  </xml>
+</div>
+
+<h1>CODE</h1>
+
+<pre data-lang="htmlmixed" id="js"></pre>
+
+
+
+<ul class="toolbar" style="display:none;">
+  <li><a href="#" target="_blank" id="data-url"><i class="fa fa-external-link"></i></a></li>
+  <li><button id="refresh"><i class="fa fa-refresh"></i></button></li>
+</ul>
+
+
+
+
+
+
+<script src="vendor/jquery.js"></script>
+<script src="vendor/codemirror/codemirror.js"></script>
+<script src="vendor/codemirror/xml.js"></script>
+<script src="vendor/codemirror/css.js"></script>
+<script src="vendor/codemirror/javascript.js"></script>
+<script src="vendor/codemirror/htmlmixed.js"></script>
+<script src="vendor/codemirror/runmode.js"></script>
+<script src="vendor/codemirror/colorize.js"></script>
+<script src="vendor/blockly/blockly_compressed.js"></script>
+<script src="vendor/blockly/blocks_compressed.js"></script>
+<script src="vendor/blockly/javascript_compressed.js"></script>
+<script src="vendor/blockly/en.js"></script>
+<script src="vendor/mdn-b64.js"></script>
+<script src="vendor/d3.v3.min.js"></script>
+<script src="dom-blocks.js"></script>
+<script src="dom-diagram.js"></script>
+<script>
+// Workspace save/load functionality.
+
+var KEY_NAME = 'blockly_dom_tutorial_xml?' +
+               window.location.search.slice(1);
+
+function loadSavedWorkspace() {
+  var lastXML = window.sessionStorage[KEY_NAME];
+  if (lastXML) {
+    var xml = Blockly.Xml.textToDom(lastXML);
+    Blockly.Xml.domToWorkspace(Blockly.mainWorkspace, xml);
+  }
+}
+
+function saveCurrentWorkspace() {
+  var xml = Blockly.Xml.workspaceToDom(Blockly.mainWorkspace);
+  window.sessionStorage[KEY_NAME] = Blockly.Xml.domToPrettyText(xml);
+}
+
+// Initialization.
+
+function renderStaticDiagram() {
+  var iframe = document.createElement('iframe');
+  $('body').append(iframe);
+  var doc = iframe.contentDocument;
+  doc.open();
+  doc.write($('#html').text());
+  doc.close();
+  showDomDiagram(domToDiagram(doc.documentElement), '#static-diagram');
+  $(iframe).remove();
+};
+
+function renderDynamicDiagram(iframe, selector) {
+  var doc = iframe.contentDocument;
+  $(selector).empty();
+  var updateDiagram = showDomDiagram(domToDiagram(doc.documentElement),
+                                     selector);
+  iframe.contentWindow.addEventListener('click', function() {
+    updateDiagram(domToDiagram(doc.documentElement));
+  }, false);
+}
+
+$(function() {
+  Blockly.Blocks["query_selector"].SELECTORS = [
+    '#my-button',
+    '#output'
+  ];
+  $('script[type="text/html"]').each(function() {
+    var html = $.trim($(this).text());
+    var pre = $('<pre data-lang="htmlmixed"></pre>')
+      .attr('id', $(this).attr('id'))
+      .text(html);
+    $(this).replaceWith(pre);
+    CodeMirror.colorize(pre.get());
+  });
+
+  Blockly.inject($('#blockly')[0], {
+    path: 'vendor/blockly/',
+    toolbox: $('#toolbox')[0]
+  });
+
+  Blockly.addChangeListener(saveCurrentWorkspace);
+  loadSavedWorkspace();
+
+  var lastScriptTag;
+  var rerender = function(force) {
+    var scriptTag = '<script>\n' +
+                    Blockly.JavaScript.workspaceToCode() +
+                    '</' + 'script>';
+
+    if (!force && scriptTag == lastScriptTag) return;
+    lastScriptTag = scriptTag;
+    CodeMirror.colorize($('#js').text(scriptTag).get());
+
+    var iframe = document.createElement('iframe');
+    var html = $('#html').text().replace(
+      '</body>',
+      scriptTag + '</body>'
+    );
+
+    $('#rendering-holder').empty().append(iframe);
+
+    var doc = iframe.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    $('#data-url').attr('href', 'data:text/html;base64,' +
+                        base64EncArr(strToUTF8Arr(html)));
+    renderDynamicDiagram(iframe, '#dynamic-diagram');
+  };
+
+  Blockly.addChangeListener(rerender.bind(null, false));
+  $('#refresh').on('click', rerender.bind(null, true));
+
+  renderStaticDiagram();
+});
+</script>
