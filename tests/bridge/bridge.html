@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../vendor/font-awesome/css/font-awesome.css">
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  overflow: hidden;
+  width: 200px;
+  font-size: 0;
+  font-family: sans-serif;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.content {
+  padding: 4px;
+  font-size: 12px;
+}
+
+.tray-icon {
+  float: right;
+  cursor: default;
+  padding: 0 4px;
+}
+
+#connected {
+  color: yellow;
+  display: none;
+}
+
+#modified {
+  color: lightgreen;
+  display: none;
+}
+</style>
+<title>Blockly Bridge</title>
+<div class="content">
+  <a href="./editor.html" target="blockly_bridge_editor" data-window-features="width=800,height=600"><i class="fa fa-puzzle-piece" style="padding-right: 0.5em;"></i>Open Blockly Editor</a>
+  <i id="connected" class="fa fa-bolt tray-icon" title="Using code from the Blockly editor."></i>
+  <i id="modified" class="fa fa-exclamation-circle tray-icon" title="Code in the Blockly editor has been modified. Reload this page to see your changes."></i>
+</div>
+<script src="storage.js"></script>
+<script src="../vendor/jquery.js"></script>
+<script>
+function makeStyle() {
+  return 'position: absolute; bottom: 0; left: 0; border: none; ' +
+         'overflow: hidden; ' +
+         'width: ' + $('.content').outerWidth() + 'px; ' +
+         'height: ' + $('.content').outerHeight() + 'px;';
+}
+
+$(function() {
+  var startScript = JSONStorage.get('script');
+  var editorLink = $('a[target="blockly_bridge_editor"]');
+  var baseEditorHref = editorLink.attr('href');
+
+  setInterval(function() {
+    if (JSONStorage.get('editor_active')) {
+      JSONStorage.remove('editor_active');
+      window.parent.postMessage(JSON.stringify({type: 'editor_active'}), '*');
+    }
+    if (JSONStorage.get('reload')) {
+      JSONStorage.remove('reload');
+      window.parent.postMessage(JSON.stringify({type: 'reload'}), '*');
+    }
+    $('#modified').toggle(JSONStorage.get('script') !== startScript);
+  }, 100);
+
+  window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
+
+    var msg = JSON.parse(event.data);
+
+    if (msg.type == 'init') {
+      var params = {};
+      if (msg.blocklySource)
+        params.blocklySource = msg.blocklySource;
+      if (msg.noRemoteReload)
+        params.noRemoteReload = 'on';
+      editorLink.attr('href', baseEditorHref + '?' + $.param(params));
+      if (msg.usingBlocklyCode)
+        $('#connected').show();
+    }
+  }, false);
+
+  window.parent.postMessage(JSON.stringify({
+    type: 'init',
+    script: startScript,
+    style: makeStyle()
+  }), "*");
+
+  $('a[data-window-features]').click(function(e) {
+    e.preventDefault();
+    window.open(this.href, this.target, $(this).attr('data-window-features'));
+  });
+});
+</script>
